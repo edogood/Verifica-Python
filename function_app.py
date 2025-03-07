@@ -81,11 +81,16 @@ def register_singer(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(json.dumps({"Messaggio": "Serve il nome del cantante"}), status_code=400)
     
     with get_db_connection() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM cantanti WHERE nome = ?", (name,))
+        exists = cursor.fetchone()
+        
+        if exists:
+            return func.HttpResponse(json.dumps({"Messaggio": "Questo cantante esiste già"}), status_code=400)
+        
         cursor.execute("INSERT INTO cantanti (nome) VALUES (?)", (name,))
         conn.commit()
     
     return func.HttpResponse(json.dumps({"Messaggio": "Cantante inserito", "name": name}), status_code=201)
-
 @app.route(route="utenti", methods=["POST"])
 def register_user(req: func.HttpRequest) -> func.HttpResponse:
     """Registra un utente."""
@@ -112,6 +117,12 @@ def assign_points(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(json.dumps({"Messaggio": "Metti un valore valido"}), status_code=400)
     
     with get_db_connection() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM punteggi WHERE cantante_id = ?", (cantante_id,))
+        exists = cursor.fetchone()
+        
+        if exists:
+            return func.HttpResponse(json.dumps({"Messaggio": "Questo cantante ha già un punteggio assegnato"}), status_code=400)
+        
         cursor.execute("INSERT INTO punteggi (cantante_id, punti, descrizione) VALUES (?, ?, ?)", (cantante_id, punti, descrizione))
         conn.commit()
     
