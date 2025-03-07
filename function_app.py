@@ -56,6 +56,64 @@ def assign_points(req: func.HttpRequest) -> func.HttpResponse:
     
     return func.HttpResponse(json.dumps({"Messaggio": "Punti assegnati!"}), status_code=201)
 
+import azure.functions as func
+import logging
+import pyodbc
+import json
+import os
+
+app = func.FunctionApp()
+
+def get_db_connection():
+    return pyodbc.connect(
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f'SERVER={os.getenv("SERVER")};'
+        f'DATABASE={os.getenv("DATABASE")};'
+        f'Trusted_Connection={os.getenv("Trusted_Connection")};'
+    )
+
+@app.route(route="cantanti", methods=["POST"])
+def register_singer(req: func.HttpRequest) -> func.HttpResponse:
+    data = req.get_json()
+    name = data.get("name")
+    if not name:
+        return func.HttpResponse(json.dumps({"Messaggio": "Serve il nome del cantante"}), status_code=400)
+    
+    with get_db_connection() as conn, conn.cursor() as cursor:
+        cursor.execute("INSERT INTO cantanti (nome) VALUES (?)", (name,))
+        conn.commit()
+    
+    return func.HttpResponse(json.dumps({"Messaggio": "Cantante inserito", "name": name}), status_code=201)
+
+@app.route(route="utenti", methods=["POST"])
+def register_user(req: func.HttpRequest) -> func.HttpResponse:
+    data = req.get_json()
+    username = data.get("name")
+    if not username:
+        return func.HttpResponse(json.dumps({"Messaggio": "Nome inserito"}), status_code=400)
+    
+    with get_db_connection() as conn, conn.cursor() as cursor:
+        cursor.execute("INSERT INTO utenti (nome_utente) VALUES (?)", (username,))
+        conn.commit()
+    
+    return func.HttpResponse(json.dumps({"Messaggio": "Utente registrato!", "username": username}), status_code=201)
+
+@app.route(route="punteggi", methods=["POST"])
+def assign_points(req: func.HttpRequest) -> func.HttpResponse:
+    data = req.get_json()
+    cantante_id = data.get("cantante_id")
+    punti = data.get("punti")
+    descrizione = data.get("descrizione", "")
+    
+    if punti is None or cantante_id is None or not isinstance(punti, int):
+        return func.HttpResponse(json.dumps({"Messaggio": "Metti un valore valido"}), status_code=400)
+    
+    with get_db_connection() as conn, conn.cursor() as cursor:
+        cursor.execute("INSERT INTO punteggi (cantante_id, punti, descrizione) VALUES (?, ?, ?)", (cantante_id, punti, descrizione))
+        conn.commit()
+    
+    return func.HttpResponse(json.dumps({"Messaggio": "Punti assegnati!"}), status_code=201)
+
 @app.route(route="squadra", methods=["POST"])
 def add_to_team(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -72,17 +130,20 @@ def add_to_team(req: func.HttpRequest) -> func.HttpResponse:
     with get_db_connection() as conn, conn.cursor() as cursor:
         cursor.execute("SELECT COUNT(*) FROM squadre WHERE utente_id = ?", (utente_id,))
         count = cursor.fetchone()[0]
-
         if count >= 5:
             return func.HttpResponse(json.dumps({"Messaggio": "Un utente non può avere più di cinque cantanti"}), status_code=400)
 
-        try:
-            cursor.execute("INSERT INTO squadre (utente_id, cantante_id) VALUES (?, ?)", (utente_id, cantante_id))
-            conn.commit()
-        except pyodbc.IntegrityError:
-            return func.HttpResponse(json.dumps({"message": "Cantante già nella squadra"}), status_code=400)
-
+        cursor.execute("SELECT 1 FROM squadre WHERE utente_id = ? AND cantante_id = ?", (utente_id, cantante_id))
+        exists = cursor.fetchone()
+        
+        if exists:
+            return func.HttpResponse(json.dumps({"message": "Cantante già presente nella squadra"}), status_code=400)
+        
+        cursor.execute("INSERT INTO squadre (utente_id, cantante_id) VALUES (?, ?)", (utente_id, cantante_id))
+        conn.commit()
+    
     return func.HttpResponse(json.dumps({"message": "Cantante aggiunto con successo"}), status_code=201)
+
 
 @app.route(route="punti/squadra/{utente_id}", methods=["GET"])
 def team_score(req: func.HttpRequest) -> func.HttpResponse:
