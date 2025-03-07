@@ -74,6 +74,7 @@ def get_db_connection():
 
 @app.route(route="cantanti", methods=["POST"])
 def register_singer(req: func.HttpRequest) -> func.HttpResponse:
+    """Registra un cantante."""
     data = req.get_json()
     name = data.get("name")
     if not name:
@@ -87,6 +88,7 @@ def register_singer(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="utenti", methods=["POST"])
 def register_user(req: func.HttpRequest) -> func.HttpResponse:
+    """Registra un utente."""
     data = req.get_json()
     username = data.get("name")
     if not username:
@@ -100,6 +102,7 @@ def register_user(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="punteggi", methods=["POST"])
 def assign_points(req: func.HttpRequest) -> func.HttpResponse:
+    """Assegna punti a un cantante."""
     data = req.get_json()
     cantante_id = data.get("cantante_id")
     punti = data.get("punti")
@@ -116,10 +119,11 @@ def assign_points(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="squadra", methods=["POST"])
 def add_to_team(req: func.HttpRequest) -> func.HttpResponse:
+    """Aggiunge un cantante alla squadra di un utente."""
     try:
         data = req.get_json()
     except ValueError:
-        return func.HttpResponse(json.dumps({"message": "Invalid JSON data"}), status_code=400)
+        return func.HttpResponse(json.dumps({"Messaggio": "Invalid JSON data"}), status_code=400)
 
     utente_id = data.get("utente_id")
     cantante_id = data.get("cantante_id")
@@ -147,6 +151,7 @@ def add_to_team(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="punti/squadra/{utente_id}", methods=["GET"])
 def team_score(req: func.HttpRequest) -> func.HttpResponse:
+    """Restituisce il punteggio totale di una squadra."""
     try:
         utente_id = int(req.route_params.get("utente_id"))
     except (ValueError, TypeError):
@@ -163,10 +168,11 @@ def team_score(req: func.HttpRequest) -> func.HttpResponse:
         )
         score = cursor.fetchone()[0] or 0
 
-    return func.HttpResponse(json.dumps({"utente_id": utente_id, "total_score": score}), status_code=200)
+    return func.HttpResponse(json.dumps({"utente_id": utente_id, "punti_totali": score}), status_code=200)
 
 @app.route(route="punti/cantante/{cantante_id}", methods=["GET"])
 def singer_score(req: func.HttpRequest) -> func.HttpResponse:
+    """Restituisce il punteggio totale di un cantante."""
     try:
         cantante_id = int(req.route_params.get("cantante_id"))
     except (ValueError, TypeError):
@@ -176,4 +182,4 @@ def singer_score(req: func.HttpRequest) -> func.HttpResponse:
         cursor.execute("SELECT SUM(punti) FROM punteggi WHERE cantante_id = ?", (cantante_id,))
         score = cursor.fetchone()[0] or 0
 
-    return func.HttpResponse(json.dumps({"cantante_id": cantante_id, "total_score": score}), status_code=200)
+    return func.HttpResponse(json.dumps({"cantante_id": cantante_id, "punti_totali": score}), status_code=200)
